@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  name      String
+  age       Int
+  condition String
+  medication String
+  email     String
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Pill counts for 5 different pill types
+  pill1Count Int @default(0)
+  pill2Count Int @default(0)
+  pill3Count Int @default(0)
+  pill4Count Int @default(0)
+  pill5Count Int @default(0)
+  
+  // Low pill alert thresholds
+  pill1Threshold Int @default(10)
+  pill2Threshold Int @default(10)
+  pill3Threshold Int @default(10)
+  pill4Threshold Int @default(10)
+  pill5Threshold Int @default(10)
+  
+  schedule Schedule?
+  dispensingHistory DispensingHistory[]
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  patientId String   @unique
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Schedule times (stored as comma-separated HH:MM format, e.g., "08:00,14:00,20:00")
+  times     String
+  
+  // Quantity per pill type for each dose
+  pill1Quantity Int @default(0)
+  pill2Quantity Int @default(0)
+  pill3Quantity Int @default(0)
+  pill4Quantity Int @default(0)
+  pill5Quantity Int @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DispensingHistory {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  dispensedAt DateTime @default(now())
+  
+  // Pills dispensed in this dose
+  pill1Dispensed Int @default(0)
+  pill2Dispensed Int @default(0)
+  pill3Dispensed Int @default(0)
+  pill4Dispensed Int @default(0)
+  pill5Dispensed Int @default(0)
+  
+  success Boolean @default(true)
+}
