@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pill, Calendar } from "lucide-react";
+import Link from "next/link"; 
 import {
   LineChart,
   Line,
@@ -96,13 +97,14 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            {/* <Button className="bg-blue-600 hover:bg-blue-700">
               <Pill className="mr-2 h-4 w-4" />
               Dispense Now
-            </Button>
-            <Button variant="outline" className="border-blue-200 text-blue-600">
+            </Button> */}
+            <Button asChild variant="outline" className="border-blue-200 text-blue-600">
+              <Link href="/schedule">
               <Calendar className="mr-2 h-4 w-4" />
-              Set Schedule
+              View Calendar</Link>
             </Button>
           </div>
         </div>
