@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit, Copy } from "lucide-react";
+import { Plus, Trash2, Copy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface Patient {
@@ -33,10 +33,17 @@ interface Patient {
   };
 }
 
+const PILL_COLORS = [
+  "bg-teal-100 text-teal-700",
+  "bg-amber-100 text-amber-700",
+  "bg-violet-100 text-violet-700",
+  "bg-rose-100 text-rose-700",
+  "bg-sky-100 text-sky-700",
+];
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -105,12 +112,8 @@ export default function PatientsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this patient?")) return;
-
     try {
-      const response = await fetch(`/api/patients/${id}`, {
-        method: "DELETE",
-      });
-
+      const response = await fetch(`/api/patients/${id}`, { method: "DELETE" });
       if (response.ok) {
         toast.success("Patient deleted successfully!");
         fetchPatients();
@@ -131,251 +134,215 @@ export default function PatientsPage() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="flex items-center gap-2 text-slate-500">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+          <span className="text-sm">Loading patients...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen overflow-y-auto p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div className="h-screen overflow-y-auto">
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur-sm px-8 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-            <p className="text-gray-500">Manage patient information and medication</p>
+            <h1 className="text-xl font-semibold text-slate-900">Patients</h1>
+            <p className="text-xs text-slate-500">
+              {patients.length} patient{patients.length !== 1 ? "s" : ""} registered
+            </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Plus className="mr-2 h-3.5 w-3.5" />
                 Add Patient
               </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add New Patient</DialogTitle>
+                <DialogTitle className="text-slate-900">Add New Patient</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
+              <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name" className="text-xs text-slate-600">Full Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="age" className="text-xs text-slate-600">Age</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      placeholder="30"
+                      value={formData.age}
+                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    value={formData.age}
-                    onChange={(e) =>
-                      setFormData({ ...formData, age: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="condition">Condition</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="condition" className="text-xs text-slate-600">Condition</Label>
                   <Input
                     id="condition"
+                    placeholder="e.g. Hypertension"
                     value={formData.condition}
-                    onChange={(e) =>
-                      setFormData({ ...formData, condition: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="medication">Medication</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="medication" className="text-xs text-slate-600">Medication</Label>
                   <Input
                     id="medication"
+                    placeholder="e.g. Amlodipine"
                     value={formData.medication}
-                    onChange={(e) =>
-                      setFormData({ ...formData, medication: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, medication: e.target.value })}
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs text-slate-600">Email Address</Label>
                   <Input
                     id="email"
                     type="email"
+                    placeholder="patient@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                   />
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  <div>
-                    <Label htmlFor="pill1">Pill 1</Label>
-                    <Input
-                      id="pill1"
-                      type="number"
-                      value={formData.pill1Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pill1Count: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pill2">Pill 2</Label>
-                    <Input
-                      id="pill2"
-                      type="number"
-                      value={formData.pill2Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pill2Count: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pill3">Pill 3</Label>
-                    <Input
-                      id="pill3"
-                      type="number"
-                      value={formData.pill3Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pill3Count: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pill4">Pill 4</Label>
-                    <Input
-                      id="pill4"
-                      type="number"
-                      value={formData.pill4Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pill4Count: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pill5">Pill 5</Label>
-                    <Input
-                      id="pill5"
-                      type="number"
-                      value={formData.pill5Count}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pill5Count: e.target.value })
-                      }
-                    />
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-600">Initial Pill Counts</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <div key={num} className="space-y-1">
+                        <p className={`rounded-md px-2 py-0.5 text-center text-[10px] font-medium ${PILL_COLORS[num - 1]}`}>
+                          Pill {num}
+                        </p>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={formData[`pill${num}Count` as keyof typeof formData]}
+                          onChange={(e) =>
+                            setFormData({ ...formData, [`pill${num}Count`]: e.target.value })
+                          }
+                          className="text-center text-sm"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700">
                   Add Patient
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
+      </div>
 
-        {/* Patients Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {patients.map((patient) => (
-            <Card key={patient.id} className="border-gray-200">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">
-                      {patient.name}
-                    </CardTitle>
-                    <p className="text-sm text-gray-500">Age: {patient.age}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-medium ${
-                      patient.status === "Active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {patient.status}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-xs text-gray-500">Condition</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {patient.condition}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Medication</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {patient.medication}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Pill Counts</p>
-                  <div className="mt-1 flex gap-2">
-                    {[
-                      patient.pill1Count,
-                      patient.pill2Count,
-                      patient.pill3Count,
-                      patient.pill4Count,
-                      patient.pill5Count,
-                    ].map((count, idx) => (
-                      <div
-                        key={idx}
-                        className="flex h-8 w-8 items-center justify-center rounded bg-blue-100 text-xs font-medium text-blue-700"
-                      >
-                        {count}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Patient ID (Controller Key)</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <code className="flex-1 truncate rounded bg-gray-100 px-2 py-1 text-xs">
-                      {patient.id}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyPatientId(patient.id)}
+      <div className="mx-auto max-w-7xl p-8">
+        {patients.length === 0 ? (
+          <div className="flex h-64 flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white">
+            <Users className="h-10 w-10 text-slate-300" />
+            <p className="mt-3 text-sm font-medium text-slate-500">No patients registered yet</p>
+            <p className="text-xs text-slate-400">Click &quot;Add Patient&quot; to get started</p>
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {patients.map((patient) => (
+              <Card key={patient.id} className="border-0 shadow-sm overflow-hidden">
+                {/* Colored top accent */}
+                <div className={`h-1 w-full ${patient.status === "Active" ? "bg-teal-500" : "bg-slate-300"}`} />
+                <CardHeader className="pb-3 pt-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">{patient.name}</p>
+                      <p className="text-xs text-slate-400">Age {patient.age}</p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        patient.status === "Active"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
                     >
-                      <Copy className="h-3 w-3" />
-                    </Button>
+                      <span className={`h-1.5 w-1.5 rounded-full ${patient.status === "Active" ? "bg-emerald-500" : "bg-slate-400"}`} />
+                      {patient.status}
+                    </span>
                   </div>
-                </div>
-                <div className="flex gap-2 pt-2">
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Condition</p>
+                      <p className="mt-0.5 text-sm font-medium text-slate-800">{patient.condition}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Medication</p>
+                      <p className="mt-0.5 text-sm font-medium text-slate-800">{patient.medication}</p>
+                    </div>
+                  </div>
+
+                  {/* Pill counts */}
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">Pill Inventory</p>
+                    <div className="flex gap-1.5">
+                      {[
+                        patient.pill1Count,
+                        patient.pill2Count,
+                        patient.pill3Count,
+                        patient.pill4Count,
+                        patient.pill5Count,
+                      ].map((count, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex flex-1 flex-col items-center rounded-lg py-2 ${PILL_COLORS[idx]}`}
+                        >
+                          <span className="text-[10px] font-medium opacity-70">P{idx + 1}</span>
+                          <span className="text-sm font-bold">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Patient ID */}
+                  <div>
+                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                      Device Key
+                    </p>
+                    <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2">
+                      <code className="flex-1 truncate text-[10px] text-slate-500">{patient.id}</code>
+                      <button
+                        onClick={() => copyPatientId(patient.id)}
+                        className="text-slate-400 hover:text-teal-600 transition-colors"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="ghost"
                     onClick={() => handleDelete(patient.id)}
-                    className="flex-1"
+                    className="w-full text-rose-500 hover:bg-rose-50 hover:text-rose-600"
                   >
-                    <Trash2 className="mr-1 h-3 w-3" />
-                    Delete
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Remove Patient
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {patients.length === 0 && (
-          <Card className="border-gray-200">
-            <CardContent className="flex h-64 items-center justify-center">
-              <div className="text-center">
-                <p className="text-lg font-medium text-gray-900">No patients yet</p>
-                <p className="text-sm text-gray-500">
-                  Add your first patient to get started
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </div>

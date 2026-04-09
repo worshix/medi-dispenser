@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pill, Calendar } from "lucide-react";
-import Link from "next/link"; 
+import { Users, Activity, Calendar, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import {
   LineChart,
   Line,
@@ -73,135 +73,158 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="flex items-center gap-2 text-slate-500">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+          <span className="text-sm">Loading dashboard...</span>
+        </div>
       </div>
     );
   }
 
   const dispensingChartData = Object.entries(stats.dispensingByDay).map(
-    ([day, value]) => ({
-      day,
-      pills: value,
-    })
+    ([day, value]) => ({ day, pills: value })
   );
 
   return (
-    <div className="h-screen overflow-y-auto p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div className="h-screen overflow-y-auto">
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur-sm px-8 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500">
-              Welcome back! Here&apos;s your medication overview
-            </p>
+            <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
+            <p className="text-xs text-slate-500">Medication management overview</p>
           </div>
-          <div className="flex gap-3">
-            {/* <Button className="bg-blue-600 hover:bg-blue-700">
-              <Pill className="mr-2 h-4 w-4" />
-              Dispense Now
-            </Button> */}
-            <Button asChild variant="outline" className="border-blue-200 text-blue-600">
-              <Link href="/schedule">
-              <Calendar className="mr-2 h-4 w-4" />
-              View Calendar</Link>
-            </Button>
-          </div>
+          <Button asChild size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Link href="/schedule">
+              <Calendar className="mr-2 h-3.5 w-3.5" />
+              View Schedule
+            </Link>
+          </Button>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Patients
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {stats.totalPatients}
+      <div className="mx-auto max-w-7xl space-y-6 p-8">
+        {/* Stat Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Patients</p>
+                  <p className="mt-1.5 text-3xl font-bold text-slate-900">{stats.totalPatients}</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
+                  <Users className="h-5 w-5 text-teal-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Active Patients
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {stats.activePatients}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active Patients</p>
+                  <p className="mt-1.5 text-3xl font-bold text-slate-900">{stats.activePatients}</p>
+                  <p className="mt-1 text-xs text-emerald-600 font-medium">Currently active</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+                  <Activity className="h-5 w-5 text-emerald-600" />
+                </div>
               </div>
-              <p className="text-sm text-green-600">Status: Active</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Dispenses Today</p>
+                  <p className="mt-1.5 text-3xl font-bold text-slate-900">
+                    {stats.dispensingByDay[new Date().toLocaleDateString("en-US", { weekday: "short" })] ?? 0}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+                  <TrendingUp className="h-5 w-5 text-amber-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Compliance Rate</p>
+                  <p className="mt-1.5 text-3xl font-bold text-slate-900">
+                    {stats.complianceData.length > 0
+                      ? `${Math.round(stats.complianceData.reduce((a, b) => a + b.compliance, 0) / stats.complianceData.length)}%`
+                      : "—"}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
+                  <Calendar className="h-5 w-5 text-violet-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Charts */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Dispensing History Chart */}
-          <Card className="border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                Dispensing History
-              </CardTitle>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-700">Dispensing History</CardTitle>
+              <p className="text-xs text-slate-400">Pills dispensed per day this week</p>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={dispensingChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="day"
-                    stroke="#6b7280"
-                    style={{ fontSize: "12px" }}
-                  />
-                  <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="day" stroke="#94a3b8" style={{ fontSize: "11px" }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: "11px" }} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#fff",
-                      border: "1px solid #e5e7eb",
+                      border: "1px solid #e2e8f0",
                       borderRadius: "8px",
+                      fontSize: "12px",
                     }}
                   />
                   <Line
                     type="monotone"
                     dataKey="pills"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ fill: "#3b82f6", r: 4 }}
+                    stroke="#0d9488"
+                    strokeWidth={2.5}
+                    dot={{ fill: "#0d9488", r: 3, strokeWidth: 0 }}
+                    activeDot={{ r: 5 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Medication Compliance Chart */}
-          <Card className="border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                Medication Compliance
-              </CardTitle>
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-700">Medication Compliance</CardTitle>
+              <p className="text-xs text-slate-400">Weekly adherence percentage</p>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats.complianceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="week"
-                    stroke="#6b7280"
-                    style={{ fontSize: "12px" }}
-                  />
-                  <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats.complianceData} barSize={28}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="week" stroke="#94a3b8" style={{ fontSize: "11px" }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" style={{ fontSize: "11px" }} tickLine={false} axisLine={false} domain={[0, 100]} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#fff",
-                      border: "1px solid #e5e7eb",
+                      border: "1px solid #e2e8f0",
                       borderRadius: "8px",
+                      fontSize: "12px",
                     }}
+                    formatter={(v) => [`${v}%`, "Compliance"]}
                   />
-                  <Bar dataKey="compliance" fill="#60a5fa" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="compliance" fill="#0d9488" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -209,59 +232,54 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Dispensing Table */}
-        <Card className="border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">
-              Recent Dispensing Activity
-            </CardTitle>
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-slate-700">Recent Dispensing Activity</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-sm text-gray-500">
-                    <th className="pb-3 font-medium">Patient</th>
-                    <th className="pb-3 font-medium">Date &amp; Time</th>
-                    <th className="pb-3 font-medium">Pills Dispensed</th>
-                    <th className="pb-3 font-medium">Status</th>
+          <CardContent className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Patient</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date &amp; Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Pills Dispensed</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {stats.recentDispensing.length > 0 ? (
+                  stats.recentDispensing.map((record) => {
+                    const totalPills =
+                      record.pill1Dispensed +
+                      record.pill2Dispensed +
+                      record.pill3Dispensed +
+                      record.pill4Dispensed +
+                      record.pill5Dispensed;
+                    return (
+                      <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-3.5 text-sm font-medium text-slate-900">{record.patient.name}</td>
+                        <td className="px-6 py-3.5 text-sm text-slate-500">
+                          {new Date(record.dispensedAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-3.5 text-sm text-slate-600">{totalPills} pills</td>
+                        <td className="px-6 py-3.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Success
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-400">
+                      No dispensing activity yet
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {stats.recentDispensing.length > 0 ? (
-                    stats.recentDispensing.map((record) => {
-                      const totalPills =
-                        record.pill1Dispensed +
-                        record.pill2Dispensed +
-                        record.pill3Dispensed +
-                        record.pill4Dispensed +
-                        record.pill5Dispensed;
-                      return (
-                        <tr key={record.id} className="border-b border-gray-100">
-                          <td className="py-3 font-medium text-gray-900">
-                            {record.patient.name}
-                          </td>
-                          <td className="py-3 text-gray-600">
-                            {new Date(record.dispensedAt).toLocaleString()}
-                          </td>
-                          <td className="py-3 text-gray-600">{totalPills} pills</td>
-                          <td className="py-3">
-                            <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                              Success
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-gray-500">
-                        No dispensing activity yet
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                )}
+              </tbody>
+            </table>
           </CardContent>
         </Card>
       </div>

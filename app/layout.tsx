@@ -31,7 +31,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <TooltipProvider>
-          <div className="flex h-screen overflow-hidden bg-gray-50">
+          <div className="flex h-screen overflow-hidden bg-slate-100">
             <Sidebar />
             <main className="flex-1 overflow-y-auto">
               {children}
