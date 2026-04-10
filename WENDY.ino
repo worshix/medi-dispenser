@@ -146,7 +146,22 @@ void setup() {
 
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, NTP_SERVER);
   lcdForce("Syncing time...", "");
-  delay(2000);
+  {
+    struct tm t;
+    int attempts = 0;
+    while (!getLocalTime(&t) && attempts < 20) {
+      delay(500);
+      attempts++;
+    }
+    if (getLocalTime(&t)) {
+      char buf[6];
+      snprintf(buf, sizeof(buf), "%02d:%02d", t.tm_hour, t.tm_min);
+      lcdForce("Time synced", String(buf));
+    } else {
+      lcdForce("Time sync fail", "Check WiFi/NTP");
+    }
+    delay(1000);
+  }
 
   fetchSchedule();
 
