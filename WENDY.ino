@@ -13,10 +13,8 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* PATIENT_ID = "cmm0s4fjc0000vdn38d2mf32i";
 const char* SERVER_URL = "http://10.18.120.85:3000/api";
 
-// ─── NTP (adjust GMT_OFFSET_SEC for your timezone, e.g. UTC+2 = 7200) ───────
-const char* NTP_SERVER      = "pool.ntp.org";
+// ─── Timezone offset (adjust for your timezone, e.g. UTC+2 = 7200) ──────────
 const long  GMT_OFFSET_SEC  = 7200;
-const int   DAYLIGHT_OFFSET = 0;
 
 // ─── LCD ─────────────────────────────────────────────────────────────────────
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -144,26 +142,7 @@ void setup() {
 
   connectWiFi();
 
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, NTP_SERVER);
-  lcdForce("Syncing time...", "");
-  {
-    struct tm t;
-    int attempts = 0;
-    while (!getLocalTime(&t) && attempts < 20) {
-      delay(500);
-      attempts++;
-    }
-    if (getLocalTime(&t)) {
-      char buf[6];
-      snprintf(buf, sizeof(buf), "%02d:%02d", t.tm_hour, t.tm_min);
-      lcdForce("Time synced", String(buf));
-    } else {
-      lcdForce("Time sync fail", "Check WiFi/NTP");
-    }
-    delay(1000);
-  }
-
-  fetchSchedule();
+  fetchSchedule(); // time is set inside parseSchedule() from serverTime field
 
   updateRevDurations();
   forceDisplayRefresh();
@@ -434,6 +413,19 @@ void fetchSchedule() {
 void parseSchedule(String json) {
   StaticJsonDocument<1024> doc;
   if (deserializeJson(doc, json)) { Serial.println("JSON parse error"); return; }
+
+  // Set ESP32 clock from server time (no NTP/internet needed)
+  long serverTime = doc["serverTime"] | 0;
+  if (serverTime > 0) {
+    time_t t = (time_t)(serverTime + GMT_OFFSET_SEC);
+    struct timeval tv = { t, 0 };
+    settimeofday(&tv, nullptr);
+    Serial.println("Clock set from server: " + getCurrentTimeString());
+    lcdForce("Time set", getCurrentTimeString());
+    delay(1000);
+  } else {
+    Serial.println("Warning: no serverTime in response");
+  }
 
   String name = doc["patientName"] | "Unknown";
   lcdForce("Patient:", name.substring(0, 16));

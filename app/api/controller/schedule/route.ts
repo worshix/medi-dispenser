@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
 
     // Return schedule data in a simple format for microcontroller
     return NextResponse.json({
+      serverTime: Math.floor(Date.now() / 1000), // Unix timestamp (UTC seconds)
       patientId: patient.id,
       patientName: patient.name,
       times: patient.schedule.times.split(","), // Convert comma-separated to array
