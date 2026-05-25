@@ -411,11 +411,12 @@ void fetchSchedule() {
 }
 
 void parseSchedule(String json) {
-  StaticJsonDocument<1024> doc;
-  if (deserializeJson(doc, json)) { Serial.println("JSON parse error"); return; }
+  StaticJsonDocument<2048> doc;
+  DeserializationError err = deserializeJson(doc, json);
+  if (err) { Serial.println("JSON parse error: " + String(err.c_str())); return; }
 
   // Set ESP32 clock from server time (no NTP/internet needed)
-  long serverTime = doc["serverTime"] | 0;
+  long serverTime = doc["serverTime"] | 0L;
   if (serverTime > 0) {
     time_t t = (time_t)(serverTime + GMT_OFFSET_SEC);
     struct timeval tv = { t, 0 };
