@@ -44,34 +44,44 @@ int PRE_PATTERN_LEN          = 5;
 unsigned long POST_PATTERN[] = {500, 200, 500};
 int POST_PATTERN_LEN         = 3;
 
-// ─── Motors ──────────────────────────────────────────────────────────────────
-#define MOTOR1_IN1 4
-#define MOTOR1_EN  2
-#define MOTOR2_IN1 19
-#define MOTOR2_EN  18
-#define MOTOR3_IN1 25
-#define MOTOR3_EN  33
+// ─── Servo signal pins (one PWM pin per servo) ───────────────────────────────
+// Uses the same GPIO numbers as the old MOTOR_IN1 pins.
+// EN pins are no longer needed – servos are self-contained.
+#define SERVO1_PIN 4
+#define SERVO2_PIN 19
+#define SERVO3_PIN 25
 
+// ─── Custom servo PWM parameters ─────────────────────────────────────────────
+// Standard hobby servo protocol: 50 Hz signal, 1 ms = 0°, 2 ms = 180°
+// With 16-bit resolution: period = 65536 ticks = 20 ms
+//   1 ms  → 65536 / 20      = 3277 ticks  (0°)
+//   2 ms  → 65536 / 20 * 2  = 6554 ticks  (180°)
+const int  SERVO_FREQ     = 50;
+const int  SERVO_RES      = 16;
+const long SERVO_DUTY_0   = 3277;   // 1 ms pulse  → 0°
+const long SERVO_DUTY_180 = 6554;   // 2 ms pulse  → 180°
+
+// Dwell time (ms): how long the servo holds at 180° before snapping back to 0°.
+// One dispense cycle = go to 180°, wait dwellMs, return to 0°.
+// Tune per-servo if your mechanisms differ.
+unsigned long servo1DwellMs = 700;
+unsigned long servo2DwellMs = 700;
+unsigned long servo3DwellMs = 700;
+
+// ─── Servo timing state ───────────────────────────────────────────────────────
 unsigned long motor1StartTime   = 0;
 unsigned long motor2StartTime   = 0;
 unsigned long motor3StartTime   = 0;
-unsigned long motor1RevDuration = 1000;
-unsigned long motor2RevDuration = 1000;
-unsigned long motor3RevDuration = 1000;
+unsigned long motor1RevDuration = 700;   // mirrors servo1DwellMs; updated by updateRevDurations()
+unsigned long motor2RevDuration = 700;
+unsigned long motor3RevDuration = 700;
 
 bool motor1Running = false;
 bool motor2Running = false;
 bool motor3Running = false;
 
-int motor1Speed = 140;
-int motor2Speed = 140;
-int motor3Speed = 140;
-
-const int pwmFrequency = 5000;
-const int pwmResolution = 8;
-
 // ─── Display ─────────────────────────────────────────────────────────────────
-// Idle modes: 0 = next dose + time, 1 = motor status, 2 = temp/humid
+// Idle modes: 0 = next dose + time, 1 = servo status, 2 = temp/humid
 int  displayMode            = 0;
 unsigned long lastDisplayModeChange = 0;
 unsigned long lastDisplayUpdate     = 0;
@@ -89,7 +99,7 @@ const unsigned long DHT_READ_INTERVAL = 2000;
 #define MAX_TIMES 10
 String scheduledTimes[MAX_TIMES];
 int    scheduleCount = 0;
-int    pillQty[3]    = {0, 0, 0};   // dose quantities for motors 1-3
+int    pillQty[3]    = {0, 0, 0};   // dose quantities for servos 1-3
 bool   scheduleLoaded = false;
 
 // ─── Dispense state machine ───────────────────────────────────────────────────
@@ -106,14 +116,43 @@ enum DispenseState {
 };
 DispenseState dispenseState = DS_IDLE;
 
-int  dispenseRemaining[3] = {0, 0, 0};  // revolutions still to fire per motor
+int  dispenseRemaining[3] = {0, 0, 0};  // sweeps still to fire per servo
 int  dispenseTotal[3]     = {0, 0, 0};  // original quantities (for display)
-int  currentPill          = 0;          // 1, 2, or 3 – which pill is running now
+int  currentPill          = 0;          // 1, 2, or 3 – which pill slot is active
 
 String lastDispensedMinute = "";
 
 unsigned long lastTimeCheck = 0;
 const unsigned long TIME_CHECK_INTERVAL = 10000;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CUSTOM SERVO FUNCTIONS  (no Servo.h needed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Attach all three servo pins to the ledc peripheral at 50 Hz / 16-bit.
+// Parks every servo at 0° on startup.
+void servoAttachAll() {
+  ledcAttach(SERVO1_PIN, SERVO_FREQ, SERVO_RES);
+  ledcAttach(SERVO2_PIN, SERVO_FREQ, SERVO_RES);
+  ledcAttach(SERVO3_PIN, SERVO_FREQ, SERVO_RES);
+  servoWrite(SERVO1_PIN, 0);
+  servoWrite(SERVO2_PIN, 0);
+  servoWrite(SERVO3_PIN, 0);
+}
+
+// Write an angle (0–180°) to a servo pin.
+// Linearly maps angle → duty cycle within the 1 ms – 2 ms pulse range.
+void servoWrite(int pin, int angle) {
+  angle = constrain(angle, 0, 180);
+  long duty = SERVO_DUTY_0 + ((long)(SERVO_DUTY_180 - SERVO_DUTY_0) * angle) / 180;
+  ledcWrite(pin, (uint32_t)duty);
+}
+
+// Stop PWM output entirely – servo holds last position mechanically (no jitter).
+// Call after the servo has settled at 0° to save power on idle slots.
+void servoOff(int pin) {
+  ledcWrite(pin, 0);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SETUP
@@ -132,13 +171,8 @@ void setup() {
   lcd.clear();
   lcdForce("MediDispenser", "Starting...");
 
-  ledcAttach(MOTOR1_IN1, pwmFrequency, pwmResolution);
-  ledcAttach(MOTOR1_EN,  pwmFrequency, pwmResolution);
-  ledcAttach(MOTOR2_IN1, pwmFrequency, pwmResolution);
-  ledcAttach(MOTOR2_EN,  pwmFrequency, pwmResolution);
-  ledcAttach(MOTOR3_IN1, pwmFrequency, pwmResolution);
-  ledcAttach(MOTOR3_EN,  pwmFrequency, pwmResolution);
-  stopAllMotors();
+  // Attach servos and park them at 0° before anything else moves
+  servoAttachAll();
 
   connectWiFi();
 
@@ -164,21 +198,21 @@ void loop() {
     lastDHTReadTime = now;
   }
 
-  // Motor completion checks
+  // Servo completion checks – dwell time elapsed → return servo to 0°
   if (motor1Running && (now - motor1StartTime >= motor1RevDuration)) {
     stopMotor1();
     motor1Running = false;
-    Serial.println("Motor 1 revolution done");
+    Serial.println("Servo 1 sweep done – returned to 0°");
   }
   if (motor2Running && (now - motor2StartTime >= motor2RevDuration)) {
     stopMotor2();
     motor2Running = false;
-    Serial.println("Motor 2 revolution done");
+    Serial.println("Servo 2 sweep done – returned to 0°");
   }
   if (motor3Running && (now - motor3StartTime >= motor3RevDuration)) {
     stopMotor3();
     motor3Running = false;
-    Serial.println("Motor 3 revolution done");
+    Serial.println("Servo 3 sweep done – returned to 0°");
   }
 
   // Advance dispense state machine every loop
@@ -276,11 +310,11 @@ void advanceDispenseState() {
     case DS_PRE_BEEP:
       if (buzzerDone) {
         dispenseState = DS_MOTOR1;
-        advanceDispenseState();  // immediately try motor 1
+        advanceDispenseState();  // immediately try servo 1
       }
       break;
 
-    // ── Motor 1 ─────────────────────────────────────────────────────────────
+    // ── Servo 1 ─────────────────────────────────────────────────────────────
     case DS_MOTOR1:
       if (motor1Running) return;
       if (dispenseRemaining[0] > 0) {
@@ -293,7 +327,7 @@ void advanceDispenseState() {
       }
       break;
 
-    // ── Motor 2 ─────────────────────────────────────────────────────────────
+    // ── Servo 2 ─────────────────────────────────────────────────────────────
     case DS_MOTOR2:
       if (motor2Running) return;
       if (dispenseRemaining[1] > 0) {
@@ -306,7 +340,7 @@ void advanceDispenseState() {
       }
       break;
 
-    // ── Motor 3 ─────────────────────────────────────────────────────────────
+    // ── Servo 3 ─────────────────────────────────────────────────────────────
     case DS_MOTOR3:
       if (motor3Running) return;
       if (dispenseRemaining[2] > 0) {
@@ -474,44 +508,47 @@ void confirmDispensing() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  MOTORS
+//  SERVOS  (custom implementation – no Servo.h)
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Sync revDuration variables with the dwell time settings.
+// Dwell time = how long the servo holds at 180° before returning to 0°.
 void updateRevDurations() {
-  motor1RevDuration = map(motor1Speed, 0, 255, 2000, 500);
-  motor2RevDuration = map(motor2Speed, 0, 255, 2000, 500);
-  motor3RevDuration = map(motor3Speed, 0, 255, 2000, 500);
+  motor1RevDuration = servo1DwellMs;
+  motor2RevDuration = servo2DwellMs;
+  motor3RevDuration = servo3DwellMs;
 }
 
+// Trigger one 180° sweep on servo 1.
+// The servo stays at 180° for servo1DwellMs, then stopMotor1() snaps it back.
 void startMotor1Once() {
   motor1StartTime = millis();
-  ledcWrite(MOTOR1_IN1, motor1Speed);
-  ledcWrite(MOTOR1_EN,  motor1Speed);
+  servoWrite(SERVO1_PIN, 180);
   motor1Running = true;
-  Serial.println("Motor 1 started");
+  Serial.println("Servo 1: 0° → 180°");
   forceDisplayRefresh(); updateDisplay();
 }
 
 void startMotor2Once() {
   motor2StartTime = millis();
-  ledcWrite(MOTOR2_IN1, motor2Speed);
-  ledcWrite(MOTOR2_EN,  motor2Speed);
+  servoWrite(SERVO2_PIN, 180);
   motor2Running = true;
-  Serial.println("Motor 2 started");
+  Serial.println("Servo 2: 0° → 180°");
   forceDisplayRefresh(); updateDisplay();
 }
 
 void startMotor3Once() {
   motor3StartTime = millis();
-  ledcWrite(MOTOR3_IN1, motor3Speed);
-  ledcWrite(MOTOR3_EN,  motor3Speed);
+  servoWrite(SERVO3_PIN, 180);
   motor3Running = true;
-  Serial.println("Motor 3 started");
+  Serial.println("Servo 3: 0° → 180°");
   forceDisplayRefresh(); updateDisplay();
 }
 
-void stopMotor1()    { ledcWrite(MOTOR1_IN1, 0); ledcWrite(MOTOR1_EN, 0); }
-void stopMotor2()    { ledcWrite(MOTOR2_IN1, 0); ledcWrite(MOTOR2_EN, 0); }
-void stopMotor3()    { ledcWrite(MOTOR3_IN1, 0); ledcWrite(MOTOR3_EN, 0); }
+// Return servo to home position (0°) after the dwell period.
+void stopMotor1()    { servoWrite(SERVO1_PIN, 0); }
+void stopMotor2()    { servoWrite(SERVO2_PIN, 0); }
+void stopMotor3()    { servoWrite(SERVO3_PIN, 0); }
 void stopAllMotors() { stopMotor1(); stopMotor2(); stopMotor3(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -564,16 +601,15 @@ void updateDisplay() {
   }
 
   if (dispenseState == DS_MOTOR1 || dispenseState == DS_MOTOR2 || dispenseState == DS_MOTOR3) {
-    // Line 0: which pill is running + progress dots
+    // Line 0: which pill slot is active + animation dots
     String l0 = "Dispensing P" + String(currentPill);
     if (motor1Running || motor2Running || motor3Running) {
-      // Animate with a rotating marker based on time
       int dot = (millis() / 250) % 4;
       for (int i = 0; i < dot; i++) l0 += ".";
     }
     writeLine(0, l0);
 
-    // Line 1: remaining pills per slot  "P1:2 P2:1 P3:0"
+    // Line 1: remaining sweeps per slot  "P1:2 P2:1 P3:0"
     String l1 = "P1:" + String(dispenseRemaining[0]) +
                 " P2:" + String(dispenseRemaining[1]) +
                 " P3:" + String(dispenseRemaining[2]);
@@ -605,11 +641,12 @@ void updateDisplay() {
     }
 
     case 1: {
-      // Motor status – all 3 on 2 lines
-      // "M1:RDY M2:RDY  " / "M3:RDY  S:140  "
-      auto motorTag = [](bool running) -> String { return running ? "RUN" : "RDY"; };
-      writeLine(0, "M1:" + motorTag(motor1Running) + " M2:" + motorTag(motor2Running));
-      writeLine(1, "M3:" + motorTag(motor3Running) + "  Spd:" + String(motor1Speed));
+      // Servo status – position + dwell time
+      // Line 0: "S1:RDY S2:RDY  "
+      // Line 1: "S3:RDY D:700ms "
+      auto servoTag = [](bool running) -> String { return running ? "ACT" : "RDY"; };
+      writeLine(0, "S1:" + servoTag(motor1Running) + " S2:" + servoTag(motor2Running));
+      writeLine(1, "S3:" + servoTag(motor3Running) + " D:" + String(servo1DwellMs) + "ms");
       break;
     }
 
@@ -684,14 +721,27 @@ void handleSerialCommands() {
   String cmd = Serial.readStringUntil('\n');
   cmd.trim(); cmd.toLowerCase();
 
-  if      (cmd == "m1")       { startMotor1Once(); }
-  else if (cmd == "m2")       { startMotor2Once(); }
-  else if (cmd == "m3")       { startMotor3Once(); }
+  if      (cmd == "s1")       { startMotor1Once(); }
+  else if (cmd == "s2")       { startMotor2Once(); }
+  else if (cmd == "s3")       { startMotor3Once(); }
   else if (cmd == "dispense") { if (dispenseState == DS_IDLE) startDispensingSequence(); }
   else if (cmd == "fetch")    { fetchSchedule(); forceDisplayRefresh(); }
-  else if (cmd.startsWith("m1speed:")) { motor1Speed = cmd.substring(8).toInt(); updateRevDurations(); }
-  else if (cmd.startsWith("m2speed:")) { motor2Speed = cmd.substring(8).toInt(); updateRevDurations(); }
-  else if (cmd.startsWith("m3speed:")) { motor3Speed = cmd.substring(8).toInt(); updateRevDurations(); }
+  // s1dwell:XXX  – set servo 1 dwell time in ms (e.g. s1dwell:800)
+  else if (cmd.startsWith("s1dwell:")) {
+    servo1DwellMs = (unsigned long)cmd.substring(8).toInt();
+    updateRevDurations();
+    Serial.println("Servo 1 dwell set to " + String(servo1DwellMs) + " ms");
+  }
+  else if (cmd.startsWith("s2dwell:")) {
+    servo2DwellMs = (unsigned long)cmd.substring(8).toInt();
+    updateRevDurations();
+    Serial.println("Servo 2 dwell set to " + String(servo2DwellMs) + " ms");
+  }
+  else if (cmd.startsWith("s3dwell:")) {
+    servo3DwellMs = (unsigned long)cmd.substring(8).toInt();
+    updateRevDurations();
+    Serial.println("Servo 3 dwell set to " + String(servo3DwellMs) + " ms");
+  }
   else if (cmd == "status") {
     Serial.println("=== Status ===");
     Serial.printf("WiFi:    %s\n", WiFi.status() == WL_CONNECTED
@@ -701,15 +751,17 @@ void handleSerialCommands() {
     for (int i = 0; i < scheduleCount; i++) Serial.println("  " + scheduledTimes[i]);
     Serial.printf("Pills/dose: P1:%d P2:%d P3:%d\n", pillQty[0], pillQty[1], pillQty[2]);
     Serial.printf("Next dose: %s\n", getNextScheduledTime().c_str());
-    Serial.printf("Motors: M1:%s M2:%s M3:%s\n",
-                  motor1Running ? "RUN" : "STP",
-                  motor2Running ? "RUN" : "STP",
-                  motor3Running ? "RUN" : "STP");
+    Serial.printf("Servos: S1:%s S2:%s S3:%s\n",
+                  motor1Running ? "ACT" : "RDY",
+                  motor2Running ? "ACT" : "RDY",
+                  motor3Running ? "ACT" : "RDY");
+    Serial.printf("Dwell ms: S1:%lu S2:%lu S3:%lu\n",
+                  servo1DwellMs, servo2DwellMs, servo3DwellMs);
     Serial.printf("Temp: %.1f°C  Humid: %.1f%%\n", temperature, humidity);
     Serial.printf("Last dispensed: %s\n", lastDispensedMinute.c_str());
     Serial.println("==============");
   }
   else if (cmd != "") {
-    Serial.println("Commands: m1 m2 m3 dispense fetch status m1/2/3speed:XXX");
+    Serial.println("Commands: s1 s2 s3 dispense fetch status s1/2/3dwell:XXX");
   }
 }
